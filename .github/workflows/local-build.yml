@@ -1,0 +1,41 @@
+name: Local build
+
+on:
+  push:
+    branches: [ local-build, local-build-2 ]
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: Release or Debug
+        default: Release
+
+jobs:
+  app:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - name: Select Xcode
+        shell: bash
+        run: sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+      - name: Build app (no signing)
+        shell: bash
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project AgentSessions.xcodeproj \
+            -scheme AgentSessions \
+            -configuration "${{ inputs.configuration || 'Release' }}" \
+            -destination 'platform=macOS' \
+            -derivedDataPath .deriveddata-local \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Zip app
+        shell: bash
+        run: |
+          app=$(find .deriveddata-local/Build/Products -maxdepth 2 -name 'AgentSessions.app' | head -1)
+          ditto -c -k --keepParent "$app" AgentSessions.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: AgentSessions-app
+          path: AgentSessions.zip
+          retention-days: 7
